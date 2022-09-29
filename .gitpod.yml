@@ -1,0 +1,65 @@
+image:
+  file: .gitpod.Dockerfile
+# uses the .gitpod.Dockerfile to build our image, instead of a remote container URL or the gitpod default
+
+# List the ports you want to expose and what to do when they are served. See https://www.gitpod.io/docs/43_config_ports/
+# visibility: private means only you can access that port from e.g. a browser, very handy
+ports:
+  - port: 4000
+    onOpen: notify
+    visibility: private
+  - port: 5432
+    onOpen: ignore
+
+# List the start up tasks. You can start them in parallel in multiple terminals. See https://www.gitpod.io/docs/44_config_start_tasks/
+# - asdf install runs in before section (runs on prebuilds and new workspaces created from prebuilds, and restarts)
+#   - It appears that anything done by init outside of $GITPOD_REPO_ROOT is wiped out when restarting workspace
+#   - This could be handled in Dockerfile but it's preferable to confirm .tool-versions from repo which isn't available at image creation
+# - gp await-port will wait until that port is up, also very handly. Still sleep for a few seconds just because sometimes postgres isn't quite ready still. 
+# Task types are init, command, and before. They run at different times:
+# The init task runs during prebuilds or on the very first workspace startup. Put heavy or time-expensive tasks here
+# and they'll get done during prebuilds after pushing commits (when you're not waiting for them).
+#
+# The command part of tasks runs after the workspace starts up for you. Anything you do here you'll likely see and be waiting on.
+# 
+# The before part of tasks runs just before init and just before command every time they're run. Use it to do things like setup your terminals/paths/etc.
+# when you need that stuff setup before you get to the command or init tasks.
+tasks:
+  - name: phoenix
+    init: >
+      asdf install &&
+      mix local.rebar --force &&
+      mix local.hex --force &&
+      mix deps.get &&
+      mix compile &&
+      MIX_ENV=test mix compile
+    command: >
+      gp await-port 5432 &&
+      echo "Sleeping 3 seconds to let DB start" &&
+      sleep 3 &&
+      mix local.hex --force &&
+      cd $GITPOD_REPO_ROOT &&
+      mix ecto.setup &&
+      iex -S mix phx.server
+github:
+  prebuilds:
+    # enable for the default branch (defaults to true)
+    master: true
+    # enable for all branches in this repo (defaults to false)
+    branches: true
+    # enable for pull requests coming from this repo (defaults to true)
+    pullRequests: true
+    # enable for pull requests coming from forks (defaults to false)
+    pullRequestsFromForks: false
+    # add a check to pull requests (defaults to true)
+    addCheck: true
+    # add a "Review in Gitpod" button as a comment to pull requests (defaults to false)
+    addComment: false
+    # add a "Review in Gitpod" button to the pull request's description (defaults to false)
+    addBadge: true
+
+vscode:
+  extensions:
+    - elixir-lsp.elixir-ls
+    - eamodio.gitlens
+    - bradlc.vscode-tailwindcss
